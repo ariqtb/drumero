@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import StepButton from './StepButton.vue'
 
 interface TrackData {
@@ -12,10 +13,12 @@ interface TrackData {
   volume: number
   activeStep: number | null
   color: string
+  soundPreset: string
 }
 
-defineProps<{
+const props = defineProps<{
   track: TrackData
+  isGlobalKitActive?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -25,6 +28,8 @@ const emit = defineEmits<{
   (e: 'toggle-mute'): void
   (e: 'toggle-solo'): void
   (e: 'update-volume', value: number): void
+  (e: 'fill-steps', interval: number): void
+  (e: 'update-preset', value: string): void
 }>()
 
 const subdivisions = [
@@ -33,6 +38,45 @@ const subdivisions = [
   { value: '16n', label: '1/16 (Sixteenth)' },
   { value: '32n', label: '1/32 (Thirty-Second)' }
 ]
+
+const presets = computed(() => {
+  if (props.track.id === 'kick') {
+    return [
+      { value: 'classic', label: 'Synth: Classic Kick' },
+      { value: 'sub808', label: 'Synth: 808 Sub' },
+      { value: 'punchy', label: 'Synth: Punchy Dance' },
+      { value: 'soft', label: 'Synth: Soft Jazz' },
+      { value: 'sample_808_kick', label: 'Sample: TR-808' },
+      { value: 'sample_cr78_kick', label: 'Sample: CR-78' },
+      { value: 'sample_acoustic_kick', label: 'Sample: Acoustic' }
+    ]
+  } else if (props.track.id === 'snare') {
+    return [
+      { value: 'acoustic', label: 'Synth: Acoustic' },
+      { value: 'electronic', label: 'Synth: Electronic' },
+      { value: 'synthesized', label: 'Synth: 808' },
+      { value: 'noise_only', label: 'Synth: Noise Only' },
+      { value: 'sample_808_snare', label: 'Sample: TR-808' },
+      { value: 'sample_cr78_snare', label: 'Sample: CR-78' },
+      { value: 'sample_acoustic_snare', label: 'Sample: Acoustic' }
+    ]
+  } else {
+    return [
+      { value: 'closed', label: 'Synth: Closed Hat' },
+      { value: 'open', label: 'Synth: Open Hat' },
+      { value: 'industrial', label: 'Synth: Industrial' },
+      { value: 'sizzle', label: 'Synth: Sizzle Ride' },
+      { value: 'sample_808_hat', label: 'Sample: TR-808' },
+      { value: 'sample_cr78_hat', label: 'Sample: CR-78' },
+      { value: 'sample_acoustic_hat', label: 'Sample: Acoustic' }
+    ]
+  }
+})
+
+function handlePresetChange(event: Event) {
+  const target = event.target as HTMLSelectElement
+  emit('update-preset', target.value)
+}
 
 function handleSubdivisionChange(event: Event) {
   const target = event.target as HTMLSelectElement
@@ -48,6 +92,41 @@ function handleVolumeChange(event: Event) {
   const target = event.target as HTMLInputElement
   emit('update-volume', parseFloat(target.value))
 }
+
+function handleWheel(event: WheelEvent) {
+  const target = event.currentTarget as HTMLInputElement
+  if (!target) return
+
+  const min = parseFloat(target.min || '0')
+  const max = parseFloat(target.max || '100')
+  const step = parseFloat(target.step || '1')
+  const val = parseFloat(target.value)
+
+  // Normalize deltaY across different browsers and scrolling modes
+  let deltaY = event.deltaY
+  if (event.deltaMode === 1) { // Line mode (Firefox)
+    deltaY *= 33
+  } else if (event.deltaMode === 2) { // Page mode
+    deltaY *= 400
+  }
+
+  // Proportional but heavily damped delta: changes by approx 2% of range per 100px scroll
+  const range = max - min
+  const multiplier = range * 0.0002
+  let delta = deltaY * multiplier
+
+  // Ensure it changes by at least 1 step, and is aligned to the slider's step value
+  if (Math.abs(delta) < step) {
+    delta = deltaY > 0 ? step : -step
+  } else {
+    delta = Math.round(delta / step) * step
+  }
+
+  const newVal = Math.max(min, Math.min(max, val + delta))
+
+  target.value = newVal.toString()
+  target.dispatchEvent(new Event('input'))
+}
 </script>
 
 <template>
@@ -57,9 +136,46 @@ function handleVolumeChange(event: Event) {
       <div :class="['track-color-indicator', track.color]" />
       <div class="track-meta">
         <span class="track-name">{{ track.name }}</span>
-        <span class="track-sub-info">
-          {{ track.subdivision }} @ {{ track.playbackRate.toFixed(2) }}x
-        </span>
+        <div class="track-sub-info-row">
+          <span class="track-sub-info">
+            {{ track.subdivision }} @ {{ track.playbackRate.toFixed(2) }}x
+          </span>
+          <div class="quick-fill-group">
+            <span class="quick-fill-label">Fill:</span>
+            <button
+              type="button"
+              class="btn-fill btn-fill-clear"
+              title="Clear all steps"
+              @click="emit('fill-steps', 0)"
+            >
+              C
+            </button>
+            <button
+              type="button"
+              class="btn-fill"
+              title="Fill every 2 steps (8 active dots)"
+              @click="emit('fill-steps', 2)"
+            >
+              2
+            </button>
+            <button
+              type="button"
+              class="btn-fill"
+              title="Fill every 4 steps (4 active dots)"
+              @click="emit('fill-steps', 4)"
+            >
+              4
+            </button>
+            <button
+              type="button"
+              class="btn-fill"
+              title="Fill every 8 steps (2 active dots)"
+              @click="emit('fill-steps', 8)"
+            >
+              8
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -79,6 +195,21 @@ function handleVolumeChange(event: Event) {
         </select>
       </div>
 
+      <!-- Sound Preset Dropdown -->
+      <div :class="['select-wrapper', { 'select-disabled': isGlobalKitActive }]">
+        <select
+          :value="track.soundPreset"
+          :disabled="isGlobalKitActive"
+          class="custom-select"
+          aria-label="Sound Preset"
+          @change="handlePresetChange"
+        >
+          <option v-for="preset in presets" :key="preset.value" :value="preset.value">
+            {{ isGlobalKitActive ? 'Kit Override' : preset.label }}
+          </option>
+        </select>
+      </div>
+
       <!-- Playback Rate Slider -->
       <div class="slider-container">
         <div class="slider-header">
@@ -93,6 +224,7 @@ function handleVolumeChange(event: Event) {
           :value="track.playbackRate"
           aria-label="Playback Rate"
           @input="handlePlaybackRateChange"
+          @wheel.prevent="handleWheel"
         />
       </div>
 
@@ -112,6 +244,7 @@ function handleVolumeChange(event: Event) {
           :value="track.volume"
           aria-label="Volume"
           @input="handleVolumeChange"
+          @wheel.prevent="handleWheel"
         />
       </div>
 
@@ -132,19 +265,6 @@ function handleVolumeChange(event: Event) {
       >
         S
       </button>
-    </div>
-
-    <!-- Right Panel: Step Grid (16 Steps) -->
-    <div class="track-grid">
-      <StepButton
-        v-for="(active, index) in track.steps"
-        :key="index"
-        :index="index"
-        :active="active"
-        :is-current="track.activeStep === index"
-        :color-class="track.color"
-        @toggle="emit('toggle-step', index)"
-      />
     </div>
   </div>
 </template>

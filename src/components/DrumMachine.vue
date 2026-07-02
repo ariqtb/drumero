@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import * as Tone from 'tone'
 import TrackRow from './TrackRow.vue'
 import RadarTempoController from './RadarTempoController.vue'
@@ -17,6 +17,7 @@ interface TrackData {
   volume: number
   activeStep: number | null
   color: string
+  soundPreset: string
 }
 
 // Master State
@@ -38,7 +39,8 @@ const tracks = ref<TrackData[]>([
     isSolo: false,
     volume: -6,
     activeStep: null,
-    color: 'kick'
+    color: 'kick',
+    soundPreset: 'classic'
   },
   {
     id: 'snare',
@@ -51,7 +53,8 @@ const tracks = ref<TrackData[]>([
     isSolo: false,
     volume: -12,
     activeStep: null,
-    color: 'snare'
+    color: 'snare',
+    soundPreset: 'acoustic'
   },
   {
     id: 'hihat',
@@ -62,16 +65,49 @@ const tracks = ref<TrackData[]>([
     playbackRate: 1.0,
     isMuted: false,
     isSolo: false,
-    volume: -16,
+    volume: -10,
     activeStep: null,
-    color: 'hihat'
+    color: 'hihat',
+    soundPreset: 'closed'
   }
 ])
+
+const selectedKit = ref('synthesizers')
+
+const kitsConfig = {
+  tr808: {
+    kick: 'https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808bd/BD0000.WAV',
+    snare: 'https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808sd/SD0000.WAV',
+    hihat: 'https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808/CH.WAV'
+  },
+  cr78: {
+    kick: 'https://oramics.github.io/sampled/DM/CR-78/samples/kick.wav',
+    snare: 'https://oramics.github.io/sampled/DM/CR-78/samples/snare.wav',
+    hihat: 'https://oramics.github.io/sampled/DM/CR-78/samples/hihat.wav'
+  },
+  tr909: {
+    kick: 'https://oramics.github.io/sampled/DM/TR-909/Detroit/samples/kick.wav',
+    snare: 'https://oramics.github.io/sampled/DM/TR-909/Detroit/samples/snare.wav',
+    hihat: 'https://oramics.github.io/sampled/DM/TR-909/Detroit/samples/hihat-closed.wav'
+  },
+  linndrum: {
+    kick: 'https://oramics.github.io/sampled/DM/LM-2/samples/kick.wav',
+    snare: 'https://oramics.github.io/sampled/DM/LM-2/samples/snare.wav',
+    hihat: 'https://oramics.github.io/sampled/DM/LM-2/samples/hihat-closed.wav'
+  },
+  acoustic: {
+    kick: 'https://tonejs.github.io/audio/drum-samples/kick.mp3',
+    snare: 'https://tonejs.github.io/audio/drum-samples/snare.mp3',
+    hihat: 'https://tonejs.github.io/audio/drum-samples/hihat.mp3'
+  }
+}
 
 // Non-reactive Tone.js references to prevent Vue Proxy overhead
 let kickSynth: Tone.MembraneSynth | null = null
 let snareSynth: Tone.NoiseSynth | null = null
+let snareOsc: Tone.Synth | null = null
 let hihatSynth: Tone.MetalSynth | null = null
+const samplePlayers: Record<string, Tone.Player> = {}
 
 const channels: Record<string, Tone.Channel> = {}
 const sequences: Record<string, Tone.Sequence> = {}
@@ -85,7 +121,7 @@ async function initAudio() {
   // 1. Create Tone.Channels for mute, solo, and volume control per track
   channels['kick'] = new Tone.Channel({ volume: -6, mute: false, solo: false }).toDestination()
   channels['snare'] = new Tone.Channel({ volume: -12, mute: false, solo: false }).toDestination()
-  channels['hihat'] = new Tone.Channel({ volume: -16, mute: false, solo: false }).toDestination()
+  channels['hihat'] = new Tone.Channel({ volume: -10, mute: false, solo: false }).toDestination()
 
   // Apply track configuration to channels
   tracks.value.forEach((track) => {
@@ -120,18 +156,40 @@ async function initAudio() {
     }
   }).connect(channels['snare'])
 
+  snareOsc = new Tone.Synth({
+    oscillator: {
+      type: 'triangle'
+    },
+    envelope: {
+      attack: 0.005,
+      decay: 0.1,
+      sustain: 0,
+      release: 0.1
+    }
+  }).connect(channels['snare'])
+
   hihatSynth = new Tone.MetalSynth({
     envelope: {
       attack: 0.001,
-      decay: 0.08,
-      release: 0.08
+      decay: 0.05,
+      release: 0.05
     },
-    resonance: 7000,
-    harmonicity: 5.1
+    resonance: 8000,
+    harmonicity: 5.1,
+    modulationIndex: 32
   }).connect(channels['hihat'])
 
-  // 3. Setup separate sequences for each track (enables independent tempos)
+  // Load sample players from CDN for all kits dynamically
+  Object.entries(kitsConfig).forEach(([kitKey, kitSamples]) => {
+    Object.entries(kitSamples).forEach(([instrumentId, url]) => {
+      const playerKey = `sample_${kitKey}_${instrumentId}`
+      samplePlayers[playerKey] = new Tone.Player(url).connect(channels[instrumentId])
+    })
+  })
+
+  // 3. Setup separate sequences and apply presets
   tracks.value.forEach((track) => {
+    applyPresetSettings(track.id, track.soundPreset)
     setupSequence(track)
   })
 
@@ -177,14 +235,77 @@ function setupSequence(track: TrackData) {
   sequences[track.id] = seq
 }
 
-// Trigger Synthesis Engines at Scheduled Auditory Ticks
-function triggerInstrument(trackId: string, time: number, velocity: number) {
+// Play Synthesized Sounds (Fallback or Main Synth Engine)
+function playSynth(trackId: string, preset: string, time: number, velocity: number) {
   if (trackId === 'kick' && kickSynth) {
-    kickSynth.triggerAttackRelease('C1', '8n', time, velocity)
+    if (preset === 'sub808') {
+      kickSynth.triggerAttackRelease('A0', '4n', time, velocity)
+    } else if (preset === 'punchy') {
+      kickSynth.triggerAttackRelease('C1', '8n', time, velocity)
+    } else if (preset === 'soft') {
+      kickSynth.triggerAttackRelease('G0', '8n', time, velocity * 0.7)
+    } else {
+      kickSynth.triggerAttackRelease('C1', '8n', time, velocity)
+    }
   } else if (trackId === 'snare' && snareSynth) {
-    snareSynth.triggerAttack(time, velocity)
+    if (preset === 'noise_only') {
+      snareSynth.triggerAttackRelease('8n', time, velocity)
+    } else if (preset === 'electronic') {
+      snareSynth.triggerAttackRelease('16n', time, velocity)
+      if (snareOsc) {
+        snareOsc.triggerAttackRelease('A2', '16n', time, velocity * 0.5)
+      }
+    } else if (preset === 'synthesized') {
+      snareSynth.triggerAttackRelease('32n', time, velocity)
+      if (snareOsc) {
+        snareOsc.triggerAttackRelease('G2', '16n', time, velocity * 0.6)
+      }
+    } else { // acoustic
+      snareSynth.triggerAttackRelease('16n', time, velocity)
+      if (snareOsc) {
+        snareOsc.triggerAttackRelease('E2', '16n', time, velocity * 0.6)
+      }
+    }
   } else if (trackId === 'hihat' && hihatSynth) {
-    hihatSynth.triggerAttack(time, velocity)
+    if (preset === 'sizzle') {
+      hihatSynth.triggerAttackRelease('F6', '2n', time, velocity * 0.6)
+    } else if (preset === 'open') {
+      hihatSynth.triggerAttackRelease('F#6', '4n', time, velocity * 0.8)
+    } else {
+      hihatSynth.triggerAttackRelease('G6', '32n', time, velocity)
+    }
+  }
+}
+
+// Trigger Synthesis Engines or Sample Players at Scheduled Ticks
+function triggerInstrument(trackId: string, time: number, velocity: number) {
+  const track = tracks.value.find((t) => t.id === trackId)
+  
+  if (selectedKit.value === 'synthesizers') {
+    // 1. Synthesizer mode: Play custom synth preset selected on each individual track
+    const preset = track ? track.soundPreset : 'default'
+    
+    // Play sample preset if chosen on individual track
+    if (preset.startsWith('sample_')) {
+      const player = samplePlayers[preset]
+      if (player && player.loaded) {
+        player.start(time)
+        return
+      }
+    }
+    
+    playSynth(trackId, preset, time, velocity)
+  } else {
+    // 2. Global Drum Kit mode: Play sample from the globally selected drum kit
+    const playerKey = `sample_${selectedKit.value}_${trackId}`
+    const player = samplePlayers[playerKey]
+    if (player && player.loaded) {
+      player.start(time)
+    } else {
+      // Fallback to default synthesizers if sample is loading/offline
+      const fallbackPreset = trackId === 'kick' ? 'classic' : (trackId === 'snare' ? 'acoustic' : 'closed')
+      playSynth(trackId, fallbackPreset, time, velocity)
+    }
   }
 }
 
@@ -224,12 +345,60 @@ function updateMasterVolume(event: Event) {
   }
 }
 
+function handleWheel(event: WheelEvent) {
+  const target = event.currentTarget as HTMLInputElement
+  if (!target) return
+
+  const min = parseFloat(target.min || '0')
+  const max = parseFloat(target.max || '100')
+  const step = parseFloat(target.step || '1')
+  const val = parseFloat(target.value)
+
+  // Normalize deltaY across different browsers and scrolling modes
+  let deltaY = event.deltaY
+  if (event.deltaMode === 1) { // Line mode (Firefox)
+    deltaY *= 33
+  } else if (event.deltaMode === 2) { // Page mode
+    deltaY *= 400
+  }
+
+  // Proportional but heavily damped delta: changes by approx 2% of range per 100px scroll
+  const range = max - min
+  const multiplier = range * 0.0002
+  let delta = deltaY * multiplier
+
+  // Ensure it changes by at least 1 step, and is aligned to the slider's step value
+  if (Math.abs(delta) < step) {
+    delta = deltaY > 0 ? step : -step
+  } else {
+    delta = Math.round(delta / step) * step
+  }
+
+  const newVal = Math.max(min, Math.min(max, val + delta))
+
+  target.value = newVal.toString()
+  target.dispatchEvent(new Event('input'))
+}
+
 // Track Control Emits handlers
 function toggleStep(trackId: string, stepIndex: number) {
   const track = tracks.value.find((t) => t.id === trackId)
   if (track) {
     track.steps[stepIndex] = !track.steps[stepIndex]
     track.velocities[stepIndex] = track.steps[stepIndex] ? 1.0 : 0.0
+  }
+}
+
+function handleFillSteps(trackId: string, interval: number) {
+  const track = tracks.value.find((t) => t.id === trackId)
+  if (track) {
+    if (interval === 0) {
+      track.steps = Array(16).fill(false)
+      track.velocities = Array(16).fill(0.0)
+    } else {
+      track.steps = Array.from({ length: 16 }, (_, i) => i % interval === 0)
+      track.velocities = track.steps.map((active) => active ? 1.0 : 0.0)
+    }
   }
 }
 
@@ -308,6 +477,78 @@ function handleUpdateVolume(trackId: string, value: number) {
   }
 }
 
+function handleUpdatePreset(trackId: string, value: string) {
+  const track = tracks.value.find((t) => t.id === trackId)
+  if (track) {
+    track.soundPreset = value
+    if (isAudioInitialized.value) {
+      applyPresetSettings(trackId, value)
+    }
+  }
+}
+
+function applyPresetSettings(trackId: string, preset: string) {
+  if (trackId === 'kick' && kickSynth) {
+    if (preset === 'sub808') {
+      kickSynth.envelope.decay = 0.8
+      kickSynth.envelope.sustain = 0.05
+      kickSynth.octaves = 8
+    } else if (preset === 'punchy') {
+      kickSynth.envelope.decay = 0.2
+      kickSynth.envelope.sustain = 0
+      kickSynth.octaves = 6
+    } else if (preset === 'soft') {
+      kickSynth.envelope.decay = 0.15
+      kickSynth.envelope.sustain = 0
+      kickSynth.octaves = 3
+    } else { // classic
+      kickSynth.envelope.decay = 0.35
+      kickSynth.envelope.sustain = 0
+      kickSynth.octaves = 5
+    }
+  } else if (trackId === 'snare' && snareSynth) {
+    if (preset === 'electronic') {
+      snareSynth.noise.type = 'white'
+      snareSynth.envelope.decay = 0.1
+    } else if (preset === 'noise_only') {
+      snareSynth.noise.type = 'white'
+      snareSynth.envelope.decay = 0.25
+    } else if (preset === 'synthesized') {
+      snareSynth.noise.type = 'pink'
+      snareSynth.envelope.decay = 0.08
+    } else { // acoustic
+      snareSynth.noise.type = 'pink'
+      snareSynth.envelope.decay = 0.15
+    }
+  } else if (trackId === 'hihat' && hihatSynth) {
+    if (preset === 'open') {
+      hihatSynth.envelope.decay = 0.3
+      hihatSynth.envelope.release = 0.3
+      hihatSynth.resonance = 7000
+      hihatSynth.harmonicity = 5.1
+      hihatSynth.modulationIndex = 32
+    } else if (preset === 'industrial') {
+      hihatSynth.envelope.decay = 0.04
+      hihatSynth.envelope.release = 0.04
+      hihatSynth.resonance = 5000
+      hihatSynth.harmonicity = 8.5
+      hihatSynth.modulationIndex = 64
+    } else if (preset === 'sizzle') {
+      hihatSynth.envelope.decay = 0.6
+      hihatSynth.envelope.release = 0.6
+      hihatSynth.resonance = 9000
+      hihatSynth.harmonicity = 3.2
+      hihatSynth.modulationIndex = 16
+    } else { // closed
+      hihatSynth.envelope.decay = 0.05
+      hihatSynth.envelope.release = 0.05
+      hihatSynth.resonance = 8000
+      hihatSynth.harmonicity = 5.1
+      hihatSynth.modulationIndex = 32
+    }
+  }
+}
+
 // Pattern Helper Utilities
 function clearPattern() {
   tracks.value.forEach((track) => {
@@ -324,14 +565,29 @@ function randomizePattern() {
   })
 }
 
+function handleGlobalKeydown(e: KeyboardEvent) {
+  if (e.code === 'Space') {
+    e.preventDefault()
+    togglePlay()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleGlobalKeydown)
+})
+
 // Component Teardown Cleanup
 onUnmounted(() => {
+  window.removeEventListener('keydown', handleGlobalKeydown)
+  
   Tone.Transport.stop()
   Object.values(sequences).forEach((seq) => seq.dispose())
   Object.values(channels).forEach((ch) => ch.dispose())
+  Object.values(samplePlayers).forEach((player) => player.dispose())
   
   if (kickSynth) kickSynth.dispose()
   if (snareSynth) snareSynth.dispose()
+  if (snareOsc) snareOsc.dispose()
   if (hihatSynth) hihatSynth.dispose()
 })
 </script>
@@ -344,81 +600,98 @@ onUnmounted(() => {
       <p class="app-subtitle">Explore independent tempos & subdivisions per track in real-time</p>
     </header>
 
-    <!-- Dashboard Layout: Radar Controller + Master Control Dashboard -->
-    <div class="dashboard-layout">
-      <div class="left-sidebar-stack">
-        <RadarTempoController
-          :tracks="tracks"
-          @toggle-step="toggleStep"
-        />
-        
-        <RadarBeatVisualizer
-          :tracks="tracks"
-          @update-step-velocity="handleUpdateStepVelocity"
-        />
+    <!-- Master Control Dashboard -->
+    <section class="master-controls glass-panel" aria-label="Master Controls" style="margin-bottom: 1.5rem;">
+      <div class="master-group" style="gap: 1rem;">
+        <button
+          type="button"
+          :class="['btn', 'btn-primary', 'btn-play', { 'btn-active': isPlaying }]"
+          @click="togglePlay"
+        >
+          <span v-if="isPlaying">⏸ Pause</span>
+          <span v-else>▶ Play</span>
+        </button>
+
+        <div class="select-wrapper">
+          <select
+            v-model="selectedKit"
+            class="custom-select"
+            aria-label="Global Drum Kit"
+            style="min-width: 170px;"
+          >
+            <option value="synthesizers">🎛 Synth Engine</option>
+            <option value="tr808">🥁 Roland TR-808</option>
+            <option value="tr909">🥁 Roland TR-909</option>
+            <option value="linndrum">🥁 LinnDrum LM-2</option>
+            <option value="cr78">🥁 Roland CR-78</option>
+            <option value="acoustic">🥁 Acoustic Kit</option>
+          </select>
+        </div>
       </div>
 
-      <!-- Master Control Dashboard -->
-      <section class="master-controls glass-panel" aria-label="Master Controls" style="margin-bottom: 0;">
-        <div class="master-group">
-          <button
-            type="button"
-            :class="['btn', 'btn-primary', 'btn-play', { 'btn-active': isPlaying }]"
-            @click="togglePlay"
-          >
-            <span v-if="isPlaying">⏸ Pause</span>
-            <span v-else>▶ Play</span>
-          </button>
-        </div>
-
-        <!-- BPM control -->
-        <div class="master-group">
-          <div class="slider-container">
-            <div class="slider-header">
-              <span class="control-label">Master BPM</span>
-              <span class="slider-value">{{ bpm }} BPM</span>
-            </div>
-            <input
-              type="range"
-              min="60"
-              max="200"
-              step="1"
-              :value="bpm"
-              aria-label="Master BPM"
-              @input="updateBpm"
-            />
+      <!-- BPM control -->
+      <div class="master-group">
+        <div class="slider-container">
+          <div class="slider-header">
+            <span class="control-label">Master BPM</span>
+            <span class="slider-value">{{ bpm }} BPM</span>
           </div>
+          <input
+            type="range"
+            min="60"
+            max="200"
+            step="1"
+            :value="bpm"
+            aria-label="Master BPM"
+            @input="updateBpm"
+            @wheel.prevent="handleWheel"
+          />
+        </div>
 
-          <!-- Master Volume -->
-          <div class="slider-container">
-            <div class="slider-header">
-              <span class="control-label">Master Volume</span>
-              <span class="slider-value">
-                {{ masterVolume <= -40 ? 'Mute' : `${masterVolume > 0 ? '+' : ''}${masterVolume.toFixed(0)} dB` }}
-              </span>
-            </div>
-            <input
-              type="range"
-              min="-40"
-              max="6"
-              step="1"
-              :value="masterVolume"
-              aria-label="Master Volume"
-              @input="updateMasterVolume"
-            />
+        <!-- Master Volume -->
+        <div class="slider-container">
+          <div class="slider-header">
+            <span class="control-label">Master Volume</span>
+            <span class="slider-value">
+              {{ masterVolume <= -40 ? 'Mute' : `${masterVolume > 0 ? '+' : ''}${masterVolume.toFixed(0)} dB` }}
+            </span>
           </div>
+          <input
+            type="range"
+            min="-40"
+            max="6"
+            step="1"
+            :value="masterVolume"
+            aria-label="Master Volume"
+            @input="updateMasterVolume"
+            @wheel.prevent="handleWheel"
+          />
         </div>
+      </div>
 
-        <!-- Quick Actions -->
-        <div class="master-group">
-          <button type="button" class="btn" @click="randomizePattern">
-            🎲 Randomize
-          </button>
-          <button type="button" class="btn btn-danger-outline" @click="clearPattern">
-            🗑 Clear Grid
-          </button>
-        </div>
-      </section>
+      <!-- Quick Actions -->
+      <div class="master-group">
+        <button type="button" class="btn" @click="randomizePattern">
+          🎲 Randomize
+        </button>
+        <button type="button" class="btn btn-danger-outline" @click="clearPattern">
+          🗑 Clear Grid
+        </button>
+      </div>
+    </section>
+
+    <!-- Radar Controller & Visualizer side-by-side -->
+    <div class="radars-layout-horizontal">
+      <RadarTempoController
+        :tracks="tracks"
+        @toggle-step="toggleStep"
+      />
+      
+      <RadarBeatVisualizer
+        :tracks="tracks"
+        @update-step-velocity="handleUpdateStepVelocity"
+        @toggle-step="toggleStep"
+      />
     </div>
 
     <!-- Track Grid Control Board -->
@@ -427,12 +700,15 @@ onUnmounted(() => {
         v-for="track in tracks"
         :key="track.id"
         :track="track"
+        :is-global-kit-active="selectedKit !== 'synthesizers'"
         @toggle-step="(index) => toggleStep(track.id, index)"
         @update-subdivision="(value) => handleUpdateSubdivision(track.id, value)"
         @update-playback-rate="(value) => handleUpdatePlaybackRate(track.id, value)"
         @toggle-mute="handleToggleMute(track.id)"
         @toggle-solo="handleToggleSolo(track.id)"
         @update-volume="(value) => handleUpdateVolume(track.id, value)"
+        @fill-steps="(value) => handleFillSteps(track.id, value)"
+        @update-preset="(value) => handleUpdatePreset(track.id, value)"
       />
     </main>
 

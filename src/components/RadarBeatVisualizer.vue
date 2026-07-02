@@ -16,6 +16,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update-step-velocity', trackId: string, stepIndex: number, velocity: number): void
+  (e: 'toggle-step', trackId: string, stepIndex: number): void
 }>()
 
 // SVG geometry configuration
@@ -54,6 +55,7 @@ function getCoords(trackId: string, index: number, radius: number) {
 const svgRef = ref<SVGSVGElement | null>(null)
 const activeDragTrack = ref<string | null>(null)
 const activeDragStep = ref<number | null>(null)
+const hasDragged = ref(false)
 
 // 1. Process track shapes, active polygons, and reference handle positions
 const trackShapes = computed(() => {
@@ -63,8 +65,11 @@ const trackShapes = computed(() => {
     // Calculate coordinates for all 16 handles (active or inactive)
     const allSteps = track.steps.map((active, index) => {
       const velocity = track.velocities[index] !== undefined ? track.velocities[index] : (active ? 1.0 : 0.0)
-      // Visual radius ranges from minRadius (15px) to maxRad (instrument maximum)
-      const radius = minRadius + velocity * (maxRad - minRadius)
+      // Active: visual radius ranges from minRadius to maxRad based on velocity
+      // Inactive: position at track radius so they're visible & clickable on the ring
+      const radius = active
+        ? minRadius + velocity * (maxRad - minRadius)
+        : maxRad
       const coords = getCoords(track.id, index, radius)
       return {
         index,
@@ -117,6 +122,7 @@ const trackShapes = computed(() => {
 function startDrag(trackId: string, stepIndex: number) {
   activeDragTrack.value = trackId
   activeDragStep.value = stepIndex
+  hasDragged.value = false
 }
 
 function handleMove(clientX: number, clientY: number) {
@@ -143,6 +149,7 @@ function handleMove(clientX: number, clientY: number) {
   // Convert to velocity (0.0 to 1.0)
   const normalized = (clampedRadius - minRadius) / (maxRad - minRadius)
 
+  hasDragged.value = true
   emit('update-step-velocity', activeDragTrack.value, activeDragStep.value, parseFloat(normalized.toFixed(2)))
 }
 
@@ -162,8 +169,13 @@ function handleTouchMove(e: TouchEvent) {
 }
 
 function stopDrag() {
+  // If user clicked without dragging, toggle the step on/off
+  if (activeDragTrack.value !== null && activeDragStep.value !== null && !hasDragged.value) {
+    emit('toggle-step', activeDragTrack.value, activeDragStep.value)
+  }
   activeDragTrack.value = null
   activeDragStep.value = null
+  hasDragged.value = false
 }
 
 // Bind global window events
@@ -223,8 +235,8 @@ onBeforeUnmount(() => {
         style="stroke: rgba(255, 255, 255, 0.015);"
       />
 
-      <!-- Loop through each instrument's shape state -->
-      <g v-for="shape in trackShapes" :key="`shape-${shape.id}`">
+      <!-- LAYER 1: Background shapes (polygons, lines, dots, playhead lines) -->
+      <g v-for="shape in trackShapes" :key="`shape-bg-${shape.id}`">
         
         <!-- Radar Sonar Line (playhead pointer) -->
         <line
@@ -247,6 +259,7 @@ onBeforeUnmount(() => {
           :cy="shape.point1.y"
           r="5"
           :class="['visualizer-dot', shape.color]"
+          style="pointer-events: none;"
         />
 
         <!-- Case 2: 2 Active Steps - Render a glowing line -->
@@ -257,6 +270,7 @@ onBeforeUnmount(() => {
           :x2="shape.point2.x"
           :y2="shape.point2.y"
           :class="['visualizer-line', shape.color]"
+          style="pointer-events: none;"
         />
 
         <!-- Case 3: >= 3 Active Steps - Render a morphing polygon -->
@@ -264,9 +278,22 @@ onBeforeUnmount(() => {
           v-else-if="shape.activePoints.length >= 3"
           :points="shape.pointsString"
           :class="['visualizer-polygon', shape.color]"
+          style="pointer-events: none;"
         />
 
-        <!-- Render the 16 draggable handles (active nodes show colored, inactive show faint gray) -->
+        <!-- Playhead sweep highlight overlay on the vertex if playhead lands on active beat -->
+        <circle
+          v-if="shape.activePlayheadPoint"
+          :cx="shape.activePlayheadPoint.x"
+          :cy="shape.activePlayheadPoint.y"
+          r="10"
+          class="radar-playhead"
+          style="pointer-events: none;"
+        />
+      </g>
+
+      <!-- LAYER 2: Interactive handle nodes (rendered on top of all shapes) -->
+      <g v-for="shape in trackShapes" :key="`shape-fg-${shape.id}`">
         <circle
           v-for="pt in shape.allSteps"
           :key="`handle-${shape.id}-${pt.index}`"
@@ -285,15 +312,6 @@ onBeforeUnmount(() => {
           :title="`${shape.name} - Step ${pt.index + 1} ${pt.active ? `(Vol: ${(pt.velocity * 100).toFixed(0)}%)` : '(Off)'}`"
           @mousedown="startDrag(shape.id, pt.index)"
           @touchstart.stop.prevent="startDrag(shape.id, pt.index)"
-        />
-
-        <!-- Playhead sweep highlight overlay on the vertex if playhead lands on active beat -->
-        <circle
-          v-if="shape.activePlayheadPoint"
-          :cx="shape.activePlayheadPoint.x"
-          :cy="shape.activePlayheadPoint.y"
-          r="10"
-          class="radar-playhead"
         />
       </g>
     </svg>

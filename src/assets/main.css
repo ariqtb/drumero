@@ -1,5 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   /* Color System */
   --bg-app: radial-gradient(circle at top, #0f172a 0%, #020617 100%);
@@ -284,8 +288,8 @@ input[type="range"]::-webkit-slider-thumb:hover {
   align-items: center;
   gap: 1.25rem;
   flex-shrink: 0;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  padding-right: 1.5rem;
+  flex-grow: 1; /* allow it to fill space nicely */
+  justify-content: flex-end; /* push elements to align with header / main card bounds */
 }
 
 /* Custom Dropdown/Select */
@@ -751,6 +755,88 @@ input[type="range"]::-webkit-slider-thumb:hover {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+}
+
+/* Quick Fill helper controls */
+.track-sub-info-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.25rem;
+}
+
+.quick-fill-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+
+.quick-fill-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-right: 4px;
+  user-select: none;
+}
+
+.btn-fill {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-fill:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+}
+
+.btn-fill-clear {
+  color: #f43f5e;
+}
+
+.btn-fill-clear:hover {
+  background: rgba(244, 63, 94, 0.15);
+  color: #f43f5e;
+}
+
+/* Horizontal alignment container for the two radars */
+.radars-layout-horizontal {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.radars-layout-horizontal > * {
+  flex: 1;
+  min-width: 320px;
+}
+
+/* Disabled select wrapper styling when global drum kit overrides sound preset */
+.select-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+.select-disabled select {
+  cursor: not-allowed;
 }
 
 
