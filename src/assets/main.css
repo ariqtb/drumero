@@ -1,0 +1,756 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* Color System */
+  --bg-app: radial-gradient(circle at top, #0f172a 0%, #020617 100%);
+  --panel-bg: rgba(15, 23, 42, 0.65);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-glow: rgba(0, 0, 0, 0.3);
+  
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-dim: #475569;
+  
+  /* Instrument Accents */
+  --color-kick: #8b5cf6;       /* Violet */
+  --color-snare: #f43f5e;      /* Rose/Pink */
+  --color-hihat: #06b6d4;      /* Cyan */
+  
+  --glow-kick: 0 0 16px rgba(139, 92, 246, 0.6);
+  --glow-snare: 0 0 16px rgba(244, 63, 94, 0.6);
+  --glow-hihat: 0 0 16px rgba(6, 182, 212, 0.6);
+  
+  --color-active: #10b981;     /* Active/Enabled (Green) */
+  --color-control: #3b82f6;    /* Interactive Controls (Blue) */
+  
+  /* Animations */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Reset & Base */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg-app);
+  color: var(--text-main);
+  min-height: 100vh;
+  padding: 2rem 1.5rem;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--color-control);
+  text-decoration: none;
+}
+
+/* Layout Container */
+.app-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Header */
+.app-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.app-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 0.5rem;
+  text-shadow: 0 4px 20px rgba(129, 140, 248, 0.15);
+}
+
+.app-subtitle {
+  font-size: 1.05rem;
+  color: var(--text-muted);
+  font-weight: 300;
+}
+
+/* Glassmorphism Card Panels */
+.glass-panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 8px 32px 0 var(--panel-glow), inset 0 1px 1px rgba(255, 255, 255, 0.05);
+}
+
+/* Master Control Console */
+.master-controls {
+  padding: 1.75rem 2rem;
+  margin-bottom: 2rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+}
+
+.master-group {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+/* Buttons */
+.btn {
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 0.625rem 1.25rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all var(--transition-fast);
+}
+
+.btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  border-color: rgba(37, 99, 235, 0.4);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+}
+
+.btn-play {
+  padding: 0.75rem 1.75rem;
+  font-size: 1.1rem;
+}
+
+.btn-active {
+  background: #10b981 !important;
+  color: #fff;
+  border-color: #10b981;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+}
+
+.btn-danger-outline {
+  color: #f43f5e;
+  border-color: rgba(244, 63, 94, 0.2);
+  background: rgba(244, 63, 94, 0.05);
+}
+
+.btn-danger-outline:hover {
+  background: rgba(244, 63, 94, 0.15);
+  border-color: rgba(244, 63, 94, 0.4);
+}
+
+/* Control Labels and Readouts */
+.control-label {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  font-weight: 500;
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.slider-container {
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+}
+
+.slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.slider-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom Sliders */
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  outline: none;
+  margin-top: 0.5rem;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text-main);
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+  transition: transform var(--transition-fast);
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+/* Track Control Board */
+.track-board {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Track Row layout */
+.track-row {
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+/* Track Info Side (left) */
+.track-info {
+  display: flex;
+  align-items: center;
+  width: 320px;
+  flex-shrink: 0;
+  gap: 1rem;
+}
+
+.track-color-indicator {
+  width: 6px;
+  height: 40px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.track-color-indicator.kick { background-color: var(--color-kick); box-shadow: 0 0 8px var(--color-kick); }
+.track-color-indicator.snare { background-color: var(--color-snare); box-shadow: 0 0 8px var(--color-snare); }
+.track-color-indicator.hihat { background-color: var(--color-hihat); box-shadow: 0 0 8px var(--color-hihat); }
+
+.track-meta {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.track-name {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-bottom: 0.15rem;
+}
+
+.track-sub-info {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+/* Track Sub Controls (middle) */
+.track-controls {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-shrink: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  padding-right: 1.5rem;
+}
+
+/* Custom Dropdown/Select */
+.select-wrapper {
+  position: relative;
+}
+
+.custom-select {
+  font-family: inherit;
+  font-size: 0.85rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 0.45rem 1.75rem 0.45rem 0.75rem;
+  color: var(--text-main);
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  transition: all var(--transition-fast);
+}
+
+.custom-select:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.select-wrapper::after {
+  content: '▼';
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+/* Mute/Solo button styles */
+.btn-mute-solo {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.btn-mute {
+  color: var(--text-muted);
+}
+
+.btn-mute.muted {
+  background: rgba(244, 63, 94, 0.2);
+  border-color: rgba(244, 63, 94, 0.4);
+  color: #f43f5e;
+  box-shadow: 0 0 10px rgba(244, 63, 94, 0.15);
+}
+
+.btn-solo {
+  color: var(--text-muted);
+}
+
+.btn-solo.soloed {
+  background: rgba(234, 179, 8, 0.2);
+  border-color: rgba(234, 179, 8, 0.4);
+  color: #eab308;
+  box-shadow: 0 0 10px rgba(234, 179, 8, 0.15);
+}
+
+/* Grid Steps Area (right) */
+.track-grid {
+  display: grid;
+  grid-template-columns: repeat(16, 1fr);
+  gap: 0.35rem;
+  flex-grow: 1;
+}
+
+/* Individual Step Button */
+.step-btn {
+  aspect-ratio: 1;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.1s ease, background-color var(--transition-fast), box-shadow var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.step-btn::after {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  transition: all var(--transition-fast);
+}
+
+/* Beat division styling (make groups of 4 stand out) */
+.step-btn.beat-accent {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.step-btn.beat-accent::after {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.step-btn:hover {
+  transform: scale(1.05);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Active / Enabled Steps */
+.step-btn.is-active.kick {
+  background-color: var(--color-kick);
+  border-color: var(--color-kick);
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.3);
+}
+
+.step-btn.is-active.snare {
+  background-color: var(--color-snare);
+  border-color: var(--color-snare);
+  box-shadow: 0 0 8px rgba(244, 63, 94, 0.3);
+}
+
+.step-btn.is-active.hihat {
+  background-color: var(--color-hihat);
+  border-color: var(--color-hihat);
+  box-shadow: 0 0 8px rgba(6, 182, 212, 0.3);
+}
+
+.step-btn.is-active::after {
+  background: #fff;
+  transform: scale(1.5);
+}
+
+/* Playhead indicators (current playing step in sequence) */
+.step-btn.is-current {
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.6);
+}
+
+/* Playing + Active combined states (Glowing explosion) */
+.step-btn.is-active.is-current.kick {
+  background-color: #a78bfa;
+  box-shadow: var(--glow-kick);
+  transform: scale(1.08);
+}
+
+.step-btn.is-active.is-current.snare {
+  background-color: #fb7185;
+  box-shadow: var(--glow-snare);
+  transform: scale(1.08);
+}
+
+.step-btn.is-active.is-current.hihat {
+  background-color: #22d3ee;
+  box-shadow: var(--glow-hihat);
+  transform: scale(1.08);
+}
+
+/* Info Section / Instructions */
+.info-section {
+  margin-top: 2.5rem;
+  padding: 1.5rem 2rem;
+}
+
+.info-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.info-text {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+
+.info-list {
+  margin-left: 1.5rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.info-list code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+  color: var(--text-main);
+  font-size: 0.85rem;
+  font-family: monospace;
+}
+
+/* Audio Status Overlay (Autoplay guard prompt) */
+.audio-init-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 17, 0.85);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.audio-init-card {
+  max-width: 450px;
+  width: 90%;
+  padding: 2.5rem 2rem;
+  text-align: center;
+}
+
+.audio-init-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.audio-init-text {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 2rem;
+}
+
+/* Responsive */
+@media (max-width: 960px) {
+  .track-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  
+  .track-info {
+    width: 100%;
+  }
+  
+  .track-controls {
+    border-right: none;
+    padding-right: 0;
+    justify-content: space-between;
+  }
+}
+
+/* Circular Beat Sequencer (Radar Grid) Styles */
+.radar-card {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 350px;
+}
+
+.radar-svg {
+  overflow: visible;
+  user-select: none;
+}
+
+/* Translucent tracks for the concentric rings */
+.radar-track-ring {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.025);
+  stroke-width: 12px;
+}
+
+/* Subdivision tick lines radiating outwards (like a watch face) */
+.radar-radial-tick {
+  stroke: rgba(255, 255, 255, 0.04);
+  stroke-width: 1px;
+  stroke-dasharray: 2 4;
+}
+
+/* Individual node circles representing beat steps */
+.radar-step-node {
+  cursor: pointer;
+  fill: rgba(15, 23, 42, 0.95);
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 1.5px;
+  transition: transform 0.1s ease, fill var(--transition-fast), stroke var(--transition-fast), box-shadow var(--transition-fast);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.radar-step-node:hover {
+  transform: scale(1.25);
+  stroke: rgba(255, 255, 255, 0.4);
+}
+
+/* Active/On states for each instrument */
+.radar-step-node.is-active.kick {
+  fill: var(--color-kick);
+  stroke: var(--color-kick);
+  filter: drop-shadow(0 0 6px var(--color-kick));
+}
+
+.radar-step-node.is-active.snare {
+  fill: var(--color-snare);
+  stroke: var(--color-snare);
+  filter: drop-shadow(0 0 6px var(--color-snare));
+}
+
+.radar-step-node.is-active.hihat {
+  fill: var(--color-hihat);
+  stroke: var(--color-hihat);
+  filter: drop-shadow(0 0 6px var(--color-hihat));
+}
+
+/* Step Node swept by Playhead (is-current) */
+.radar-step-node.is-current {
+  stroke: rgba(255, 255, 255, 0.85);
+  stroke-width: 2px;
+}
+
+/* Active + Current hit state (Visual blast) */
+.radar-step-node.is-active.is-current {
+  fill: #ffffff;
+  stroke: #ffffff;
+  filter: drop-shadow(0 0 12px #ffffff);
+  transform: scale(1.15);
+}
+
+/* Playhead sweeping halo ring */
+.radar-playhead {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 2px;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.8));
+  pointer-events: none;
+}
+
+.radar-text {
+  font-size: 11px;
+  fill: var(--text-muted);
+  text-anchor: middle;
+  dominant-baseline: middle;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.radar-center-lbl {
+  font-size: 10px;
+  fill: var(--text-dim);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* Layout updates for DrumMachine to support 2 columns */
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+@media (min-width: 768px) {
+  .dashboard-layout {
+    grid-template-columns: 360px 1fr;
+    align-items: stretch;
+  }
+}
+
+/* Radar Beat Visualizer Styles */
+.visualizer-polygon {
+  stroke-width: 2px;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  transition: all var(--transition-normal);
+}
+
+.visualizer-polygon.kick {
+  fill: rgba(139, 92, 246, 0.15);
+  stroke: var(--color-kick);
+  filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.4));
+}
+
+.visualizer-polygon.snare {
+  fill: rgba(244, 63, 94, 0.15);
+  stroke: var(--color-snare);
+  filter: drop-shadow(0 0 8px rgba(244, 63, 94, 0.4));
+}
+
+.visualizer-polygon.hihat {
+  fill: rgba(6, 182, 212, 0.15);
+  stroke: var(--color-hihat);
+  filter: drop-shadow(0 0 8px rgba(6, 182, 212, 0.4));
+}
+
+.visualizer-line {
+  stroke-width: 3px;
+  stroke-linecap: round;
+  transition: all var(--transition-normal);
+}
+
+.visualizer-line.kick {
+  stroke: var(--color-kick);
+  filter: drop-shadow(0 0 6px var(--color-kick));
+}
+
+.visualizer-line.snare {
+  stroke: var(--color-snare);
+  filter: drop-shadow(0 0 6px var(--color-snare));
+}
+
+.visualizer-line.hihat {
+  stroke: var(--color-hihat);
+  filter: drop-shadow(0 0 6px var(--color-hihat));
+}
+
+.visualizer-dot {
+  stroke-width: 1.5px;
+  stroke: #ffffff;
+  transition: all var(--transition-normal);
+}
+
+.visualizer-dot.kick {
+  fill: var(--color-kick);
+  filter: drop-shadow(0 0 8px var(--color-kick));
+}
+
+.visualizer-dot.snare {
+  fill: var(--color-snare);
+  filter: drop-shadow(0 0 8px var(--color-snare));
+}
+
+.visualizer-dot.hihat {
+  fill: var(--color-hihat);
+  filter: drop-shadow(0 0 8px var(--color-hihat));
+}
+
+.visualizer-ref-dot {
+  fill: rgba(255, 255, 255, 0.08);
+  stroke: none;
+}
+
+/* Sidebar layout stack for circular grid + visualizer on left column */
+.left-sidebar-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+
